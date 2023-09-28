@@ -83,6 +83,23 @@ contract AssetFussionIndexToken is IERC20 {
     }
 
 
+    function calculateTrxToBuyIndexTokens(uint256 indexTokenAmount) public view returns (uint256[] memory) {
+        uint256[] memory totalTrxAmount = new uint256[](underlyingTokenList.length);
+        for (uint i = 0; i < underlyingTokenList.length; i++) {
+            address token = underlyingTokenList[i];
+            uint256 amount = underlyingTokens[token];
+
+            if (amount > 0) {
+                uint256 totalTokenAmount = (amount * indexTokenAmount) / (10**_decimals);
+                address[] memory path = new address[](2);
+                path[0] = address(WTRX);
+                path[1] = token;
+                uint256[] memory amountsOut = dexRouter.getAmountsIn(totalTokenAmount, path);
+                totalTrxAmount[i] = amountsOut[0];
+            }
+        }
+        return totalTrxAmount;
+    }
     
     //Deposit TRX and mint index tokens
     function mint(uint256 indexTokenAmount) payable external returns (uint256[] memory) {
