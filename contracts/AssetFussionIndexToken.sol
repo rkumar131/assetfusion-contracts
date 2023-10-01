@@ -82,7 +82,6 @@ contract AssetFussionIndexToken is IERC20 {
         _;
     }
 
-
     function calculateTrxToBuyIndexTokens(uint256 indexTokenAmount) public view returns (uint256[] memory) {
         uint256[] memory totalTrxAmount = new uint256[](underlyingTokenList.length);
         for (uint i = 0; i < underlyingTokenList.length; i++) {
@@ -101,6 +100,35 @@ contract AssetFussionIndexToken is IERC20 {
         return totalTrxAmount;
     }
     
+    function calculateTrxAfterSellIndexTokens(uint256 indexTokenAmount) public view returns (uint256[] memory) {
+        uint256[] memory totalTrxAmount = new uint256[](underlyingTokenList.length);
+        
+        for (uint i = 0; i < underlyingTokenList.length; i++) {
+            address token = underlyingTokenList[i];
+            uint256 amount = underlyingTokens[token];
+
+            if (amount > 0) {
+                uint256 totalTokenAmount = (amount * indexTokenAmount) / (10**_decimals);
+                address[] memory path = new address[](2);
+                path[0] = token;
+                path[1] = address(WTRX);
+                uint256[] memory amountsOut = dexRouter.getAmountsOut(totalTokenAmount, path);
+                totalTrxAmount[i] = amountsOut[1];
+            }
+        }
+        return totalTrxAmount;
+    }
+    
+    function calculateTotalTrxToBuyIndexTokens(uint256 indexTokenAmount) public view returns (uint256) {
+        uint256[] memory trxAmount = calculateTrxToBuyIndexTokens(indexTokenAmount);
+        return sum(trxAmount);
+    }
+        
+    function calculateTotalTrxAfterSellIndexTokens(uint256 indexTokenAmount) public view returns (uint256) {
+        uint256[] memory trxAmount = calculateTrxAfterSellIndexTokens(indexTokenAmount);
+        return sum(trxAmount);
+    }
+    
     //Deposit TRX and mint index tokens
     function mint(uint256 indexTokenAmount) payable external returns (uint256[] memory) {
         // Required TRX to buy indexTokens
@@ -113,7 +141,7 @@ contract AssetFussionIndexToken is IERC20 {
         for (uint i = 0; i < underlyingTokenList.length; i++) {
             address token = underlyingTokenList[i];
             uint256 tokenAmount = underlyingTokens[token];
-            uint256 totalTokenAmount = (tokenAmount * indexTokenAmount) / (10**_decimals);
+            uint256 totalTokenAmount = (tokenAmount * indexTokenAmount);
             uint256 requiredTrxAmount = requiredTrx[i];
 
             // Swap TRX for underlying tokens 
@@ -184,5 +212,110 @@ contract AssetFussionIndexToken is IERC20 {
         emit Redeemed(msg.sender, indexTokenAmount);
         return amounts;
     }
-   
+    
+    function sum(uint256[] memory numbers) internal pure returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < numbers.length; i++) {
+            total += numbers[i];
+        }
+        return total;
+    }
+
+    function name() public view returns (string memory) {
+        return tokenName;
+    }
+
+    function symbol() public view returns (string memory) {
+        return tokenSymbol;
+    }
+
+    function image() public view returns (string memory) {
+        return tokenImage;
+    }
+
+    function decimals() override external view returns (uint8) {
+        return _decimals;
+    }
+
+    function getCreator() public view returns (address) {
+        return owner;
+    }
+
+    function totalSupply() external view override returns (uint) {
+        return tokenTotalSupply;
+    }
+
+    function balanceOf(address _owner) external view override returns (uint) {
+        return _balanceOf[_owner];
+    }
+
+    function allowance(address _owner, address spender) external view override returns (uint) {
+        return _allowance[_owner][spender];
+    }
+
+    function getUnderlyingTokenAmounts() public view returns (uint[] memory) {
+        uint[] memory amounts = new uint[](underlyingTokenList.length);
+        for (uint j = 0; j < underlyingTokenList.length; j++) {
+            address token = underlyingTokenList[j];
+            uint amount = underlyingTokens[token];
+            amounts[j] = amount;
+        }
+        return amounts;
+    }
+
+    function getUnderlyingTokens() public view returns (address[] memory) {
+        return underlyingTokenList;
+    }
+
+    function getTotalSupply() public view returns (uint){
+        return tokenTotalSupply;
+    }
+
+
+    function transfer(address recipient, uint amount) external override returns (bool) {
+        _balanceOf[tx.origin] -= amount;
+        _balanceOf[recipient] += amount;
+
+        //add to holders array
+        holders.push(recipient);
+
+        emit Transfer(tx.origin, recipient, amount);
+        return true;
+    }
+
+    function approve(address spender, uint amount) external override returns (bool) {
+        _allowance[tx.origin][spender] = amount;
+        emit Approval(tx.origin, spender, amount);
+        return true;
+    }
+
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint amount
+    ) external override returns (bool) {
+        _allowance[sender][tx.origin] -= amount;
+        _balanceOf[sender] -= amount;
+        _balanceOf[recipient] += amount;
+
+        //add to holders array
+        holders.push(recipient);
+
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function _mint(uint256 amount) internal {
+        _balanceOf[tx.origin] += amount;
+        tokenTotalSupply += amount;
+        holders.push(tx.origin);
+
+        emit Transfer(address(0), tx.origin, amount);
+    }
+
+    function burn(address burnee, uint256 amount) internal {
+        _balanceOf[burnee] -= amount;
+        tokenTotalSupply -= amount;
+        emit Transfer(tx.origin, address(0), amount);
+    }
 }
