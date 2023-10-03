@@ -141,7 +141,7 @@ contract AssetFussionIndexToken is IERC20 {
         for (uint i = 0; i < underlyingTokenList.length; i++) {
             address token = underlyingTokenList[i];
             uint256 tokenAmount = underlyingTokens[token];
-            uint256 totalTokenAmount = (tokenAmount * indexTokenAmount);
+            uint256 totalTokenAmount = (tokenAmount * indexTokenAmount) / (10**_decimals);
             uint256 requiredTrxAmount = requiredTrx[i];
 
             // Swap TRX for underlying tokens 
